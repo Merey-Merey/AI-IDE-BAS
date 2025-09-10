@@ -104,10 +104,11 @@
 				"icon": "$(add)"
 			},
 			{
-				"command": "ai-ide-baspromptsButtonClicked",
-				"title": "%command.prompts.title%",
-				"icon": "$(organization)"
-			},
+  "command": "ai-ide-bas.promptsButtonClicked",
+  "title": "%command.prompts.title%",
+  "icon": "$(organization)"
+},
+
 			{
 				"command": "ai-ide-bas.filesButtonClicked",
 				"title": "Работа с файлами",

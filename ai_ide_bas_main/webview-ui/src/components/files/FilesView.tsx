@@ -10,6 +10,7 @@ const FilesView: React.FC<{ onDone?: () => void }> = () => {
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | undefined>(undefined)
   const [notice, setNotice] = useState<string | undefined>(undefined)
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null)
 
   const refreshStatus = useCallback(() => {
     vscode.postMessage({ type: "files:status" })
@@ -41,19 +42,46 @@ const FilesView: React.FC<{ onDone?: () => void }> = () => {
     vscode.postMessage({ type: "openExternal", url })
   }, [])
 
-  // Удаление файлов отключено для релиза
-  const _unusedConfirmAndDelete = undefined as unknown as (file: FileItem) => void
+  // Удаление файла через API
+  const handleDelete = useCallback(async (fileId: string) => {
+    if (!fileId) return
+    if (!window.confirm("Удалить файл?")) return
+
+    setDeletingFileId(fileId)
+    setError(undefined)
+    setNotice(undefined)
+
+    try {
+      const token = localStorage.getItem("token") || ""
+      const res = await fetch(`https://api.aiidebas.com/files/${fileId}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` },
+      })
+
+      if (!res.ok) {
+        if (res.status === 401) throw new Error('Необходимо войти в систему')
+        if (res.status === 403) throw new Error('У вас нет прав для удаления этого файла')
+        if (res.status === 404) throw new Error('Файл не найден')
+        if (res.status === 400) throw new Error('Некорректный идентификатор файла')
+        throw new Error('Ошибка удаления файла')
+      }
+
+      setNotice('Файл успешно удалён')
+      requestList() // обновляем список после удаления
+    } catch (e: any) {
+      setError(e.message || 'Ошибка удаления')
+    } finally {
+      setDeletingFileId(null)
+    }
+  }, [requestList])
 
   useEffect(() => {
     const onMessage = (e: MessageEvent<any>) => {
       const message = e.data
       if (message?.type === "files:authChanged") {
         setIsAuthorized(Boolean(message.isAuthorized))
-        if (message.isAuthorized) {
-          requestList()
-        } else {
-          setFiles([])
-        }
+        if (message.isAuthorized) requestList()
+        else setFiles([])
       } else if (message?.type === "files:list:result") {
         const raw = Array.isArray(message.files) ? message.files : []
         const normalized = raw.map((it: any) => ({
@@ -88,7 +116,6 @@ const FilesView: React.FC<{ onDone?: () => void }> = () => {
           <button className="btn" onClick={requestLogin}>
             Войти
           </button>
-          {/* Ввод токена отключён */}
         </div>
       )
     }
@@ -96,7 +123,12 @@ const FilesView: React.FC<{ onDone?: () => void }> = () => {
     return (
       <div className="p-4 space-y-4">
         <div className="flex gap-2 items-center">
-          <input className="input" placeholder="project_name" value={projectName} onChange={(e)=>setProjectName(e.target.value)} />
+          <input
+            className="input"
+            placeholder="project_name"
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+          />
           <button className="btn" onClick={requestList} disabled={loading}>
             {loading ? "Загрузка..." : "Обновить список"}
           </button>
@@ -114,7 +146,10 @@ const FilesView: React.FC<{ onDone?: () => void }> = () => {
             <div className="text-sm text-muted">Файлов нет</div>
           ) : (
             files.map((f) => (
-              <div key={f.filename + (f.project || "")} className="flex justify-between items-center border p-2 rounded">
+              <div
+                key={f.filename + (f.project || "")}
+                className="flex justify-between items-center border p-2 rounded"
+              >
                 <div className="flex flex-col">
                   <div className="font-mono text-sm">{f.filename}</div>
                   {f.project ? <div className="text-xs text-muted">{f.project}</div> : null}
@@ -122,20 +157,24 @@ const FilesView: React.FC<{ onDone?: () => void }> = () => {
                     <button className="link text-xs" onClick={() => openPublicUrl(f.public_url)}>Открыть</button>
                   ) : null}
                 </div>
-                <div className="flex items-center gap-2" />
+                <div className="flex items-center gap-2">
+                  <button
+                    className="btn btn-danger text-xs"
+                    onClick={() => f.id && handleDelete(f.id)}
+                    disabled={!isAuthorized || deletingFileId === f.id}
+                  >
+                    {deletingFileId === f.id ? "Удаление..." : "Удалить"}
+                  </button>
+                </div>
               </div>
             ))
           )}
         </div>
       </div>
     )
-  }, [isAuthorized, files, loading, error, notice, requestList, requestLogout, requestLogin, requestUpload, openPublicUrl, projectName])
+  }, [isAuthorized, files, loading, error, notice, requestList, requestLogout, requestLogin, requestUpload, openPublicUrl, projectName, handleDelete, deletingFileId])
 
   return <div>{body}</div>
 }
 
 export default FilesView
-
-// TokenInput удалён для релиза
-
-
