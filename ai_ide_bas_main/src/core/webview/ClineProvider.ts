@@ -833,9 +833,38 @@ export class ClineProvider
 	 * @param webview A reference to the extension webview
 	 */
 	private setWebviewMessageListener(webview: vscode.Webview) {
-		const onReceiveMessage = async (message: WebviewMessage) =>
-			webviewMessageHandler(this, message, this.marketplaceManager)
+		const onReceiveMessage = async (message: WebviewMessage) => {
+		// Обработка feedback сообщений
+        if (message.type === "feedback") {
+            const fs = require("fs");
+            const path = require("path");
+            const { v4: uuidv4 } = require("uuid");
 
+            const feedbackDir = path.join(this.context.globalStorageUri.fsPath, "feedback");
+            if (!fs.existsSync(feedbackDir)) {
+                fs.mkdirSync(feedbackDir, { recursive: true });
+            }
+
+            const feedback = {
+                id: uuidv4(),
+                rating: message.rating,
+                comment: message.comment,
+                timestamp: new Date().toISOString(),
+            };
+
+            fs.writeFileSync(
+                path.join(feedbackDir, `${feedback.id}.json`),
+                JSON.stringify(feedback, null, 2),
+                "utf-8"
+            );
+            
+            // Возвращаемся, чтобы не передавать сообщение в основной обработчик
+            return;
+        }
+
+        // Остальные сообщения обрабатываются основным обработчиком
+        webviewMessageHandler(this, message, this.marketplaceManager);
+    }
 		const messageDisposable = webview.onDidReceiveMessage(onReceiveMessage)
 		this.webviewDisposables.push(messageDisposable)
 	}

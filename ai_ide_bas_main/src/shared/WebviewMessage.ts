@@ -216,8 +216,12 @@ export interface WebviewMessage {
 		| "deleteCommand"
 		| "createCommand"
 		| "insertTextIntoTextarea"
+		| "feedback"
+		
 	text?: string
 	editedMessageContent?: string
+	rating?: number
+	comment?: string
 	tab?: "settings" | "history" | "mcp" | "modes" | "chat" | "marketplace" | "account"
 	disabled?: boolean
 	context?: string
